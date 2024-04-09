@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
@@ -49,6 +50,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.client.transaction.FileSystemBasedLockProviderTestClass;
 import org.apache.hudi.common.config.LockConfiguration;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.io.storage.HoodieFileReader;
 import org.apache.hudi.io.storage.HoodieFileReaderFactory;
 import org.apache.pulsar.common.schema.SchemaType;
@@ -390,9 +392,17 @@ public class HoodieWriterTest {
             .map(HoodieTestDataV1::fromGenericRecord)
             .collect(Collectors.toList());
 
+        Map<String, String> writeMap = writeSet.stream()
+            .collect(Collectors.toMap(r -> r.genericRecord().get("id").toString(),
+                r -> r.genericRecord().get("name").toString()));
+        Map<String, String> readMap = readSet.stream()
+            .collect(Collectors.toMap(r -> r.genericRecord().get("id").toString(),
+                r -> r.genericRecord().get("name").toString()));
+
         Assert.assertEquals(readSet.size(), writeSet.size());
-        Assert.assertTrue(writeSet.removeAll(readSet));
-        Assert.assertEquals(writeSet.size(), 0);
+        Assert.assertEquals(readMap.keySet().size(), writeMap.keySet().size());
+        Assert.assertTrue(writeMap.keySet().containsAll(readMap.keySet()));
+        Assert.assertTrue(writeMap.values().containsAll(readMap.values()));
     }
 
 
@@ -418,7 +428,9 @@ public class HoodieWriterTest {
     private List<GenericRecord> readRecordsFromFile(String path, Configuration configuration) throws IOException {
         List<GenericRecord> records = new LinkedList<>();
         org.apache.hadoop.fs.Path hdfs = new org.apache.hadoop.fs.Path(path);
-        HoodieFileReader<GenericRecord> reader = new HoodieFileReaderFactory().getFileReader(configuration, hdfs);
+        HoodieFileReader<GenericRecord> reader = HoodieFileReaderFactory
+            .getReaderFactory(HoodieRecordType.AVRO)
+            .getFileReader(configuration, hdfs);
         log.info("Reader schema is {}", reader.getSchema().toString());
         reader.getRecordIterator().forEachRemaining(r -> records.add(r.getData()));
         return records;
