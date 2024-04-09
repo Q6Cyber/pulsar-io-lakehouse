@@ -418,9 +418,9 @@ public class HoodieWriterTest {
     private List<GenericRecord> readRecordsFromFile(String path, Configuration configuration) throws IOException {
         List<GenericRecord> records = new LinkedList<>();
         org.apache.hadoop.fs.Path hdfs = new org.apache.hadoop.fs.Path(path);
-        HoodieFileReader<GenericRecord> reader = HoodieFileReaderFactory.getFileReader(configuration, hdfs);
+        HoodieFileReader<GenericRecord> reader = new HoodieFileReaderFactory().getFileReader(configuration, hdfs);
         log.info("Reader schema is {}", reader.getSchema().toString());
-        reader.getRecordIterator().forEachRemaining(records::add);
+        reader.getRecordIterator().forEachRemaining(r -> records.add(r.getData()));
         return records;
     }
 
