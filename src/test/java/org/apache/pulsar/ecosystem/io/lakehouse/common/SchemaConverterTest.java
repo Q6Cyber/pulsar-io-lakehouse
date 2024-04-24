@@ -16,11 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pulsar.ecosystem.io.lakehouse.common;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import io.delta.standalone.types.StructField;
 import io.delta.standalone.types.StructType;
 import java.util.ArrayList;
@@ -34,8 +31,8 @@ import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.ecosystem.io.lakehouse.sink.SinkConnectorUtils;
 import org.apache.pulsar.functions.api.Record;
+import org.testng.Assert;
 import org.testng.annotations.Test;
-
 
 
 /**
@@ -45,41 +42,42 @@ import org.testng.annotations.Test;
 @Slf4j
 public class SchemaConverterTest {
 
-    @Test
-    public void testConvertAvroSchemaToDeltaSchema() {
-        Map<String, SchemaType> schemaMap = new HashMap<>();
-        schemaMap.put("name", SchemaType.STRING);
-        schemaMap.put("age", SchemaType.INT32);
-        schemaMap.put("phone", SchemaType.STRING);
-        schemaMap.put("address", SchemaType.STRING);
-        schemaMap.put("score", SchemaType.DOUBLE);
+  @Test
+  public void testConvertAvroSchemaToDeltaSchema() {
+    Map<String, SchemaType> schemaMap = new HashMap<>();
+    schemaMap.put("name", SchemaType.STRING);
+    schemaMap.put("age", SchemaType.INT32);
+    schemaMap.put("phone", SchemaType.STRING);
+    schemaMap.put("address", SchemaType.STRING);
+    schemaMap.put("score", SchemaType.DOUBLE);
 
-        Map<String, Object> recordMap = new HashMap<>();
-        recordMap.put("name", "hang");
-        recordMap.put("age", 18);
-        recordMap.put("phone", "110");
-        recordMap.put("address", "GuangZhou, China");
-        recordMap.put("score", 59.9);
-        Record<GenericObject> record = SinkConnectorUtils.generateRecord(schemaMap, recordMap,
-            SchemaType.AVRO, "MyRecord");
+    Map<String, Object> recordMap = new HashMap<>();
+    recordMap.put("name", "hang");
+    recordMap.put("age", 18);
+    recordMap.put("phone", "110");
+    recordMap.put("address", "GuangZhou, China");
+    recordMap.put("score", 59.9);
+    Record<GenericObject> record = SinkConnectorUtils.generateRecord(schemaMap, recordMap,
+        SchemaType.AVRO, "MyRecord");
 
-        Schema schema = new Schema.Parser().parse(record.getSchema().getSchemaInfo().getSchemaDefinition());
+    Schema schema = new Schema.Parser().parse(
+        record.getSchema().getSchemaInfo().getSchemaDefinition());
 
-        StructType structType = SchemaConverter.convertAvroSchemaToDeltaSchema(schema);
+    StructType structType = SchemaConverter.convertAvroSchemaToDeltaSchema(schema);
 
-        List<String> fields = new ArrayList<>(schemaMap.keySet());
-        for (int i = 0; i < structType.getFields().length; ++i) {
-            StructField field = structType.getFields()[i];
-            assertEquals(field.getName(), fields.get(i));
-            assertNotNull(schemaMap.get(field.getName()));
-            // delta integer type is `integer`, avro schema integer type is `INT32`
-            if (field.getDataType().getTypeName().equals("integer")) {
-                continue;
-            }
-            assertEquals(field.getDataType().getTypeName(),
-                schemaMap.get(field.getName()).name().toLowerCase(Locale.ROOT));
-        }
-
-        // TODO test complex field type
+    List<String> fields = new ArrayList<>(schemaMap.keySet());
+    for (int i = 0; i < structType.getFields().length; ++i) {
+      StructField field = structType.getFields()[i];
+      Assert.assertEquals(field.getName(), fields.get(i));
+      Assert.assertNotNull(schemaMap.get(field.getName()));
+      // delta integer type is `integer`, avro schema integer type is `INT32`
+      if (field.getDataType().getTypeName().equals("integer")) {
+        continue;
+      }
+      Assert.assertEquals(field.getDataType().getTypeName(),
+          schemaMap.get(field.getName()).name().toLowerCase(Locale.ROOT));
     }
+
+    // TODO test complex field type
+  }
 }

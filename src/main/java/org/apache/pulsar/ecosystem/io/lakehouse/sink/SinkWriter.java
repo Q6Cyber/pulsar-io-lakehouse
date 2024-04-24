@@ -20,7 +20,13 @@
 package org.apache.pulsar.ecosystem.io.lakehouse.sink;
 
 import com.google.common.base.Strings;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
+import com.google.protobuf.Descriptors.Descriptor;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -30,11 +36,17 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.Decoder;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.protobuf.ProtobufData;
+import org.apache.avro.protobuf.ProtobufDatumReader;
+import org.apache.pulsar.common.schema.SchemaInfo;
+import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.ecosystem.io.lakehouse.SinkConnectorConfig;
+import org.apache.pulsar.ecosystem.io.lakehouse.common.ProtobufSchemaHelper;
 import org.apache.pulsar.ecosystem.io.lakehouse.common.SchemaConverter;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.CommitFailedException;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.LakehouseConnectorException;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.LakehouseWriterException;
+import org.bouncycastle.util.encoders.Base64;
 
 /**
  * Writer thread. Fetch records from queue, and write them into lakehouse table.
@@ -46,7 +58,7 @@ public class SinkWriter implements Runnable {
     private Schema currentPulsarSchema;
     private Schema schemaWithoutNull;
     private PulsarSinkRecord lastRecord;
-    private final GenericDatumReader<GenericRecord> datumReader;
+    private GenericDatumReader<GenericRecord> datumReader;
     private final long timeIntervalPerCommit;
     private long lastCommitTime;
     private long recordsCnt;
@@ -93,17 +105,33 @@ public class SinkWriter implements Runnable {
                     continue;
                 }
                 if (currentPulsarSchema == null || !currentPulsarSchema.toString().equals(schemaStr)) {
-                    Schema schema = new Schema.Parser().parse(schemaStr);
+                    log.info("Creating new schema: {}", schemaStr);
+                    Schema schema;
+                    boolean isProtoNative = false;
+                    if (pulsarSinkRecord.getSchemaType() == SchemaType.PROTOBUF_NATIVE) {
+                        SchemaInfo schemaInfo = pulsarSinkRecord.getRecord().getSchema().getSchemaInfo();
+                        schema = convertProtobufNativeToAvro(schemaInfo);
+                        isProtoNative = true;
+                    } else {
+                        schema = new Schema.Parser().parse(schemaStr);
+                    }
                     currentPulsarSchema = schema;
+                    log.info("new schema: {}", currentPulsarSchema); //remove
+
                     if (log.isDebugEnabled()) {
                         log.debug("new schema: {}", currentPulsarSchema);
                     }
                     schemaWithoutNull = SchemaConverter.convertPulsarAvroSchemaToNonNullSchema(schema);
+                    log.debug("schema no null: {}", schemaWithoutNull); //remove
+                    if (isProtoNative && !(datumReader instanceof ProtobufDatumReader)) {
+                        datumReader = new ProtobufDatumReader<>();
+                    }
                     datumReader.setSchema(schemaWithoutNull);
                     datumReader.setExpected(schemaWithoutNull);
                     if (getOrCreateWriter().updateSchema(schema)) {
                         resetStatus();
                     }
+                    log.info("Done setting up schema and reader."); //remove
                 }
                 Optional<GenericRecord> avroRecord =
                     convertToAvroGenericData(pulsarSinkRecord, schemaWithoutNull, datumReader);
@@ -186,6 +214,27 @@ public class SinkWriter implements Runnable {
         }
     }
 
+    public Schema convertProtobufNativeToAvro(SchemaInfo schemaInfo) {
+        try {
+            JsonObject jsonSchema = JsonParser.parseString(
+                new String(schemaInfo.getSchema(), StandardCharsets.UTF_8)).getAsJsonObject();
+            byte[] fileDescrBytes = Base64.decode(jsonSchema.get("fileDescriptorSet")
+                .getAsString());
+            String messageTypeName = jsonSchema.get("rootMessageTypeName").getAsString();
+            String rootFileDescriptorName = jsonSchema.get("rootFileDescriptorName").getAsString();
+            FileDescriptorSet fileDescriptorSet = FileDescriptorSet.parseFrom(fileDescrBytes);
+            List<Descriptor> descriptorList = ProtobufSchemaHelper.parseFileDescriptorSet(fileDescriptorSet,
+                rootFileDescriptorName);
+            return descriptorList.stream()
+                .filter(d -> d.getFullName().equals(messageTypeName))
+                .findFirst()
+                .map(ProtobufData.get()::getSchema)
+                .orElse(null);
+        } catch (Exception e) {
+            log.error("Failed to convert protobuf native schema to avro schema", e);
+            return null;
+        }
+    }
     public boolean isRunning() {
         return running;
     }
