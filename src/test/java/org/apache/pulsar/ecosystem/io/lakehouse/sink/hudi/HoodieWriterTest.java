@@ -49,6 +49,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.client.transaction.FileSystemBasedLockProviderTestClass;
 import org.apache.hudi.common.config.LockConfiguration;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.io.storage.HoodieFileReader;
 import org.apache.hudi.io.storage.HoodieFileReaderFactory;
 import org.apache.pulsar.common.schema.SchemaType;
@@ -418,9 +419,11 @@ public class HoodieWriterTest {
     private List<GenericRecord> readRecordsFromFile(String path, Configuration configuration) throws IOException {
         List<GenericRecord> records = new LinkedList<>();
         org.apache.hadoop.fs.Path hdfs = new org.apache.hadoop.fs.Path(path);
-        HoodieFileReader<GenericRecord> reader = HoodieFileReaderFactory.getFileReader(configuration, hdfs);
+        HoodieFileReaderFactory fileReaderFactory = HoodieFileReaderFactory.getReaderFactory(
+            HoodieRecordType.AVRO);
+        HoodieFileReader<GenericRecord> reader = fileReaderFactory.getFileReader(configuration, hdfs);
         log.info("Reader schema is {}", reader.getSchema().toString());
-        reader.getRecordIterator().forEachRemaining(records::add);
+        reader.getRecordIterator().forEachRemaining(r -> records.add(r.getData()));
         return records;
     }
 
