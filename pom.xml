@@ -55,7 +55,7 @@
     <hadoop.version>3.2.4</hadoop.version>
     <iceberg.version>0.13.1</iceberg.version>
     <parquet.version>1.12.0</parquet.version>
-    <hudi.version>0.14.1</hudi.version>
+    <hudi.version>0.15.0</hudi.version>
     <kryo.version>4.0.2</kryo.version>
     <delta.version>0.3.0</delta.version>
     <parquet.avro.version>1.12.2</parquet.avro.version>
@@ -262,6 +262,39 @@
       <dependency>
         <groupId>org.apache.hudi</groupId>
         <artifactId>hudi-java-client</artifactId>
+        <version>${hudi.version}</version>
+        <exclusions>
+          <exclusion>
+            <artifactId>log4j</artifactId>
+            <groupId>log4j</groupId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hudi</groupId>
+        <artifactId>hudi-io</artifactId>
+        <version>${hudi.version}</version>
+        <exclusions>
+          <exclusion>
+            <artifactId>log4j</artifactId>
+            <groupId>log4j</groupId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hudi</groupId>
+        <artifactId>hudi-common</artifactId>
+        <version>${hudi.version}</version>
+        <exclusions>
+          <exclusion>
+            <artifactId>log4j</artifactId>
+            <groupId>log4j</groupId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hudi</groupId>
+        <artifactId>hudi-hadoop-common</artifactId>
         <version>${hudi.version}</version>
         <exclusions>
           <exclusion>
@@ -491,6 +524,19 @@
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+
+    <dependency>
+    <groupId>org.apache.hudi</groupId>
+    <artifactId>hudi-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hudi</groupId>
+      <artifactId>hudi-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hudi</groupId>
+      <artifactId>hudi-hadoop-common</artifactId>
     </dependency>
 
     <dependency>

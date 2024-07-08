@@ -48,10 +48,15 @@ import org.apache.avro.reflect.AvroIgnore;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.client.transaction.FileSystemBasedLockProviderTestClass;
+import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.config.LockConfiguration;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.util.ConfigUtils;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
+import org.apache.hudi.io.hadoop.HoodieAvroFileReaderFactory;
 import org.apache.hudi.io.storage.HoodieFileReader;
-import org.apache.hudi.io.storage.HoodieFileReaderFactory;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.ecosystem.io.lakehouse.SinkConnectorConfig;
 import org.apache.pulsar.ecosystem.io.lakehouse.common.Utils;
@@ -139,7 +144,8 @@ public class HoodieWriterTest {
         }
 
         HoodieWriter hoodieWriter = new HoodieWriter(sinkConnectorConfig, writeSet.get(0).getSchema());
-        Configuration hadoopConf = hoodieWriter.writer.getContext().getHadoopConf().get();
+        Configuration hadoopConf = hoodieWriter.writer.getContext().getStorageConf().unwrapAs(
+            Configuration.class);
 
         for (PulsarObject<byte[]> testDatum : writeSet) {
             hoodieWriter.writeAvroRecord(testDatum.getRecord());
@@ -180,7 +186,8 @@ public class HoodieWriterTest {
         HoodieTestDataV1 testData = new HoodieTestDataV1();
         log.info("Using schema {} to initialize hoodie writer", testData.getSchema().toString());
         HoodieWriter hoodieWriter = new HoodieWriter(sinkConnectorConfig, testData.getSchema());
-        Configuration hadoopConf = hoodieWriter.writer.getContext().getHadoopConf().get();
+        Configuration hadoopConf = hoodieWriter.writer.getContext().getStorageConf().unwrapAs(
+            Configuration.class);
         Optional<FileSystem> hdfs = setupFileSystem(storage, hoodieWriter, hadoopConf);
 
         // write test data
@@ -225,7 +232,8 @@ public class HoodieWriterTest {
         HoodieTestDataV1 v1Data = new HoodieTestDataV1();
         log.info("Using schema {} to initialize hoodie writer", v1Data.getSchema().toString());
         HoodieWriter hoodieWriter = new HoodieWriter(sinkConnectorConfig, v1Data.getSchema());
-        Configuration hadoopConf = hoodieWriter.writer.getContext().getHadoopConf().get();
+        Configuration hadoopConf = hoodieWriter.writer.getContext().getStorageConf().unwrapAs(
+            Configuration.class);
         Optional<FileSystem> hdfs = setupFileSystem(storage, hoodieWriter, hadoopConf);
 
         // write v1 test data
@@ -316,7 +324,8 @@ public class HoodieWriterTest {
         HoodieTestDataV1 testData = new HoodieTestDataV1();
         log.info("Using schema {} to initialize hoodie writer", testData.getSchema().toString());
         HoodieWriter hoodieWriter = new HoodieWriter(connectorConfig, testData.getSchema());
-        Configuration hadoopConf = hoodieWriter.writer.getContext().getHadoopConf().get();
+        Configuration hadoopConf = hoodieWriter.writer.getContext().getStorageConf().unwrapAs(
+            Configuration.class);
         final Optional<FileSystem> hdfs = setupFileSystem(storage, hoodieWriter, hadoopConf);
 
         CyclicBarrier barrier = new CyclicBarrier(2);
@@ -419,9 +428,12 @@ public class HoodieWriterTest {
     private List<GenericRecord> readRecordsFromFile(String path, Configuration configuration) throws IOException {
         List<GenericRecord> records = new LinkedList<>();
         org.apache.hadoop.fs.Path hdfs = new org.apache.hadoop.fs.Path(path);
-        HoodieFileReaderFactory fileReaderFactory = HoodieFileReaderFactory.getReaderFactory(
-            HoodieRecordType.AVRO);
-        HoodieFileReader<GenericRecord> reader = fileReaderFactory.getFileReader(configuration, hdfs);
+        StoragePath storagePath = new StoragePath(hdfs.toUri());
+        StorageConfiguration<Configuration> storageConfiguration = HadoopFSUtils.getStorageConf(configuration);
+        HoodieConfig hoodieConfig = ConfigUtils.getReaderConfigs(storageConfiguration);
+        HoodieHadoopStorage hoodieStorage = new HoodieHadoopStorage(hdfs, configuration);
+        HoodieAvroFileReaderFactory fileReaderFactory = new HoodieAvroFileReaderFactory(hoodieStorage);
+        HoodieFileReader<GenericRecord> reader = fileReaderFactory.getFileReader(hoodieConfig, storagePath);
         log.info("Reader schema is {}", reader.getSchema().toString());
         reader.getRecordIterator().forEachRemaining(r -> records.add(r.getData()));
         return records;

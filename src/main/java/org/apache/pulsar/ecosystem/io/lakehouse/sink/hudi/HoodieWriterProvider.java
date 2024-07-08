@@ -30,6 +30,7 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.pulsar.ecosystem.io.lakehouse.common.Utils;
 
@@ -44,7 +45,7 @@ public class HoodieWriterProvider {
         this.sinkConfigs = sinkConfigs;
         this.hadoopConf = Utils.getDefaultHadoopConf(sinkConfigs.getProps(true));
         this.defaultWriterConfig = getDefaultConfigBuilder().build();
-        this.context = new HoodieJavaEngineContext(hadoopConf);
+        this.context = new HoodieJavaEngineContext(HadoopFSUtils.getStorageConf(hadoopConf));
         createTable();
     }
 
@@ -54,7 +55,7 @@ public class HoodieWriterProvider {
             .setPayloadClassName(HoodieAvroPayload.class.getName())
             .setKeyGeneratorClassProp(defaultWriterConfig.getKeyGeneratorClass())
             .fromProperties(sinkConfigs.getProps())
-            .initTable(hadoopConf, defaultWriterConfig.getBasePath());
+            .initTable(HadoopFSUtils.getStorageConf(hadoopConf), defaultWriterConfig.getBasePath());
     }
 
     private HoodieWriteConfig.Builder getConfigBuilderWithSchema(String schema) {
