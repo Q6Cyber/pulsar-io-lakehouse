@@ -149,7 +149,7 @@ public class SchemaConverter {
                 if (validTypes.size() == 1) {
                     newField = convertOneField(name, validTypes.get(0));
                 } else {
-                    log.error("not support this kind of union types {}", f.getTypes());
+                    log.error("not support this kind of union types {} for field {}", f.getTypes(), name);
                     throw new UnsupportedOperationException("not support this kind of field");
                 }
                 break;

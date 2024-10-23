@@ -31,7 +31,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.Decoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pulsar.ecosystem.io.lakehouse.SinkConnectorConfig;
-import org.apache.pulsar.ecosystem.io.lakehouse.common.SchemaConverter;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.CommitFailedException;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.LakehouseConnectorException;
 import org.apache.pulsar.ecosystem.io.lakehouse.exception.LakehouseWriterException;
@@ -44,7 +43,7 @@ public class SinkWriter implements Runnable {
     private final SinkConnectorConfig sinkConnectorConfig;
     private LakehouseWriter writer;
     private Schema currentPulsarSchema;
-    private Schema schemaWithoutNull;
+    //private Schema schemaWithoutNull;
     private PulsarSinkRecord lastRecord;
     private final GenericDatumReader<GenericRecord> datumReader;
     private final long timeIntervalPerCommit;
@@ -98,15 +97,15 @@ public class SinkWriter implements Runnable {
                     if (log.isDebugEnabled()) {
                         log.debug("new schema: {}", currentPulsarSchema);
                     }
-                    schemaWithoutNull = SchemaConverter.convertPulsarAvroSchemaToNonNullSchema(schema);
-                    datumReader.setSchema(schemaWithoutNull);
-                    datumReader.setExpected(schemaWithoutNull);
+                    //schemaWithoutNull = SchemaConverter.convertPulsarAvroSchemaToNonNullSchema(schema);
+                    datumReader.setSchema(currentPulsarSchema);
+                    datumReader.setExpected(currentPulsarSchema);
                     if (getOrCreateWriter().updateSchema(schema)) {
                         resetStatus();
                     }
                 }
                 Optional<GenericRecord> avroRecord =
-                    convertToAvroGenericData(pulsarSinkRecord, schemaWithoutNull, datumReader);
+                    convertToAvroGenericData(pulsarSinkRecord, currentPulsarSchema, datumReader);
                 if (avroRecord.isPresent()) {
                     getOrCreateWriter().writeAvroRecord(avroRecord.get());
                     lastRecord = pulsarSinkRecord;
