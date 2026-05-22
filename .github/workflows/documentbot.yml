@@ -42,7 +42,7 @@ jobs:
       pull-requests: write 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - uses: streamnative/github-workflow-libraries/doc-label-check@master
         with:
